@@ -1,0 +1,8 @@
+<platform xmlns="http://ns.adobe.com/air/extension/50.2">
+    <sdkVersion>12.0</sdkVersion>
+    <linkerOptions>
+        <option>-framework MediaPlayer</option>
+        <option>-framework AVFoundation</option>
+        <option>-framework AVKit</option>
+    </linkerOptions>
+</platform>

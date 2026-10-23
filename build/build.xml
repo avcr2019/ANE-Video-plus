@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="AirVideo" default="all" basedir=".">
+    <property file="build.config" />
+
+    <target name="clean" description="Clean temporary directories">
+        <delete dir="../temp" />
+    </target>
+
+    <target name="init" description="Create temporary directories">
+        <mkdir dir="../temp" />
+    </target>
+
+    <target name="ios" depends="init" description="Compile iOS library">
+        <mkdir dir="../temp/ios/build" />
+        <exec executable="xcodebuild" dir="../ios" failonerror="true">
+            <arg line="-project AirVideo.xcodeproj -alltargets clean" />
+        </exec>
+        <exec executable="xcodebuild" dir="../ios" failonerror="true">
+            <arg line="-project AirVideo.xcodeproj -sdk iphoneos -alltargets -configuration Release SYMROOT=../temp/ios/build/" />
+        </exec>
+        <copy file="../temp/ios/build/Release-iphoneos/libAirVideo.a" todir="../temp/ios" />
+        <delete dir="../temp/ios/build" />
+    </target>
+
+    <target name="android" depends="init" description="Compile Android library">
+        <mkdir dir="../android/temp/classes" />
+        
+        <javac srcdir="../android/src" destdir="../android/temp/classes" includeantruntime="false" target="1.8" source="1.8">
+            <classpath>
+                <pathelement location="${android.sdk}/android.jar" />
+                <pathelement location="${flex.sdk}/lib/android/FlashRuntimeExtensions.jar" />
+                <fileset dir="../android/libs" includes="*.jar" />
+            </classpath>
+        </javac>
+        
+        <!-- دمج ExoPlayer فقط مع استثناء أدوبي -->
+        <unzip dest="../android/temp/classes">
+            <fileset dir="../android/libs">
+                <include name="*.jar"/>
+                <exclude name="*FlashRuntimeExtensions*.jar"/>
+            </fileset>
+        </unzip>
+        
+        <delete dir="../android/temp/classes/com/adobe" />
+        
+        <mkdir dir="../temp/android" />
+        <jar destfile="../temp/android/libAirVideo.jar">
+            <fileset dir="../android/temp/classes" />
+        </jar>
+        <delete dir="../android/temp" />
+    </target>
+
+    <target name="swc" depends="init" description="Compile SWC library">
+        <mkdir dir="../temp/swc/content" />
+        <exec executable="${flex.sdk}/bin/compc" failonerror="true">
+            <arg line="-source-path ../actionscript/src" />
+            <arg line="-output ../temp/swc/AirVideo.swc" />
+            <arg line="-include-classes com.atlas4apps.ane.AirVideo.AirVideo" />
+        </exec>
+        <unzip src="../temp/swc/AirVideo.swc" dest="../temp/swc/content" />
+        <copy file="../temp/swc/content/library.swf" todir="../temp/ios" />
+        <copy file="../temp/swc/content/library.swf" todir="../temp/android" />
+        <copy file="../temp/swc/content/library.swf" todir="../temp/default" />
+        <delete dir="../temp/swc/content" />
+    </target>
+
+    <target name="package" depends="ios, android, swc" description="Package the ANE">
+        <mkdir dir="../bin" />
+        
+        <mkdir dir="../temp/Android-ARM" />
+        <copy todir="../temp/Android-ARM">
+            <fileset dir="../temp/android" />
+        </copy>
+
+        <mkdir dir="../temp/Android-ARM64" />
+        <copy todir="../temp/Android-ARM64">
+            <fileset dir="../temp/android" />
+        </copy>
+
+        <exec executable="${flex.sdk}/bin/adt" dir="../bin" failonerror="true">
+            <arg line="-package -target ane AirVideo.ane ../build/extension.xml -swc ../temp/swc/AirVideo.swc -platform iPhone-ARM -platformoptions ../build/platform.xml -C ../temp/ios . -platform Android-ARM -C ../temp/Android-ARM . -platform Android-ARM64 -C ../temp/Android-ARM64 . -platform default -C ../temp/default ." />
+        </exec>
+    </target>
+
+    <target name="all" depends="package, clean" description="Compile and package the ANE" />
+</project>
