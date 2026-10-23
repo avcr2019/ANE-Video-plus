@@ -1,0 +1,53 @@
+name: Build AirVideo ANE
+
+on:
+  push:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v5
+
+    - name: Set up Java
+      uses: actions/setup-java@v5
+      with:
+        distribution: 'zulu'
+        java-version: '11'
+
+    - name: Setup Harman AIR SDK
+      uses: joshtynjala/setup-adobe-air-action@v2
+      with:
+        air-version: '50.2.4.5'
+        accept-license: true
+
+    - name: Compile and Package ANE
+      run: |
+        if [ -z "$AIR_HOME" ]; then
+          AIR_HOME=$(dirname $(dirname $(which adt)))
+        fi
+        echo "Using AIR SDK from: $AIR_HOME"
+
+        sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 4.3;/IPHONEOS_DEPLOYMENT_TARGET = 12.0;/g' ios/AirVideo.xcodeproj/project.pbxproj
+        sed -i '' 's/ARCHS = "$(ARCHS_STANDARD_32_BIT)";/ARCHS = "$(ARCHS_STANDARD)";/g' ios/AirVideo.xcodeproj/project.pbxproj
+
+        echo '<?xml version="1.0" encoding="utf-8"?><platform xmlns="http://ns.adobe.com/air/extension/50.2"><sdkVersion>12.0</sdkVersion><linkerOptions><option>-framework AVFoundation</option><option>-framework AVKit</option><option>-framework CoreMedia</option><option>-framework UIKit</option><option>-framework Foundation</option></linkerOptions></platform>' > build/platform.xml
+
+        LATEST_ANDROID_PLATFORM=$(ls -d $ANDROID_HOME/platforms/android-* 2>/dev/null | sort -V | tail -n 1)
+        echo "Using Android Platform: $LATEST_ANDROID_PLATFORM"
+
+        cd build
+        cp example.build.config build.config
+        sed -i '' "s|/path/to/your/flexsdk/folder|$AIR_HOME|g" build.config
+        sed -i '' "s|/path/to/your/android-sdk/platforms/android-16|$LATEST_ANDROID_PLATFORM|g" build.config
+        ant
+
+    - name: Upload Finished ANE
+      uses: actions/upload-artifact@v4
+      with:
+        name: AirVideo-ANE
+        path: bin/AirVideo.ane
